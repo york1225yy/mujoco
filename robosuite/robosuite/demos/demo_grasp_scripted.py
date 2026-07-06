@@ -219,8 +219,7 @@ if __name__ == "__main__":
                         help="速度缩放（越大越快，但精度下降）")
     args = parser.parse_args()
 
-    # 根据 speed 参数调整步长
-    global MAX_STEP
+    # 根据 speed 参数调整步长（MAX_STEP 已在模块顶层定义，此处直接覆盖即可）
     MAX_STEP = 0.05 * args.speed
 
     print(f"\n{'='*50}")
