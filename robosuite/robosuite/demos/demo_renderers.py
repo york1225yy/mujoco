@@ -1,3 +1,14 @@
+# 【中文说明】
+# 功能：渲染器切换演示 —— 对比不同渲染后端的效果
+# 可用渲染器（--renderer 参数）：
+#   "mujoco"   → MuJoCo 原生渲染器（默认，速度最快）
+#   "mjviewer"  → 带交互控制面板的 MuJoCo 渲染器
+# 渲染器快捷键（运行时可用）：
+#   ]    → 切换相机视角
+#   W    → 线框模式
+#   C    → 显示接触点
+#   F1   → 查看帮助
+# 运行方式：python -m robosuite.demos.demo_renderers --renderer mujoco
 import argparse
 import time
 
@@ -7,7 +18,7 @@ import robosuite as suite
 from robosuite.controllers.composite.composite_controller_factory import load_composite_controller_config
 from robosuite.utils.input_utils import choose_environment, choose_multi_arm_config, choose_robots
 
-MAX_FR = 25  # max frame rate for running simluation
+MAX_FR = 25
 
 
 def str2bool(v):

@@ -17,9 +17,21 @@ from copy import deepcopy
 import cv2
 import numpy as np
 
+# 【中文说明】
+# 功能：传感器噪声与延迟演示 —— 模拟真实机器人传感器的不完美特性
+# 核心概念（Observables 系统）：
+#   corrupter → 给观测值添加高斯噪声（模拟传感器精度误差）
+#   delayer   → 延迟观测值的时间（模拟通信延迟/处理延迟）
+#   可在运行时动态开关噪声（按夹爪键切换）
+# 应用场景：测试控制算法对传感器噪声的鲁棒性
+# 运行方式：python -m robosuite.demos.demo_sensor_corruption --delay 0.05 --corruption 5.0
 import robosuite as suite
 from robosuite.controllers.composite.composite_controller import WholeBody
-from robosuite.utils.observables import Observable, create_gaussian_noise_corrupter, create_uniform_sampled_delayer
+from robosuite.utils.observables import (
+    Observable,
+    create_gaussian_noise_corrupter,  # 创建高斯噪声污染器
+    create_uniform_sampled_delayer,   # 创建均匀分布随机延迟器
+)
 from robosuite.wrappers import VisualizationWrapper
 
 if __name__ == "__main__":

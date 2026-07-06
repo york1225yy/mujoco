@@ -1,3 +1,8 @@
+# 【中文说明】
+# 功能：复合机器人演示 —— 动态组合「机器人本体 + 底座 + 夹爪」创建自定义机器人
+# 核心函数：create_composite_robot() —— 运行时将不同部件组合为新机器人
+# 典型用例：给 Panda 换装 Robotiq 夹爪，或给机械臂加上移动底座
+# 运行方式：python -m robosuite.demos.demo_composite_robot --robot Panda --grippers PandaGripper
 import argparse
 import time
 from typing import Dict, List, Union
@@ -5,9 +10,9 @@ from typing import Dict, List, Union
 import numpy as np
 
 import robosuite as suite
-from robosuite.controllers import load_composite_controller_config
-from robosuite.robots import ROBOT_CLASS_MAPPING
-from robosuite.utils.robot_composition_utils import create_composite_robot
+from robosuite.controllers import load_composite_controller_config  # 加载复合控制器配置
+from robosuite.robots import ROBOT_CLASS_MAPPING                    # 注册的机器人名称→类的映射
+from robosuite.utils.robot_composition_utils import create_composite_robot  # 动态组合机器人
 
 
 def create_and_test_env(

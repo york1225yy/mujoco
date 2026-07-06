@@ -163,26 +163,24 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Get controller config
+    # 加载控制器配置（None 时使用机器人默认控制器）
     controller_config = load_composite_controller_config(
         controller=args.controller,
         robot=args.robots[0],
     )
 
-    # Create argument configuration
     config = {
         "env_name": args.environment,
         "robots": args.robots,
         "controller_configs": controller_config,
     }
 
-    # Check if we're using a multi-armed environment and use env_configuration argument if so
     if "TwoArm" in args.environment:
         config["env_configuration"] = args.config
     else:
         args.config = None
 
-    # Create environment
+    # 创建环境（hard_reset=False 加快 reset 速度，不完全重建XML）
     env = suite.make(
         **config,
         has_renderer=True,
@@ -192,25 +190,25 @@ if __name__ == "__main__":
         use_camera_obs=False,
         reward_shaping=True,
         control_freq=20,
-        hard_reset=False,
+        hard_reset=False,  # 软重置：只重置状态，不重新编译XML（速度更快）
     )
 
-    # Wrap this environment in a visualization wrapper
+    # VisualizationWrapper：在渲染窗口上叠加末端执行器位置指示器
     env = VisualizationWrapper(env, indicator_configs=None)
 
-    # Setup printing options for numbers
     np.set_printoptions(formatter={"float": lambda x: "{0:0.3f}".format(x)})
 
-    # initialize device
+    # 初始化输入设备：支持 keyboard（键盘）/ spacemouse（3D鼠标）/ dualsense（PS5手柄）/ mjgui（MuJoCo GUI）
+    # 键盘控制映射：方向键=平移，其他键=旋转，空格=夹爪开合
     if args.device == "keyboard":
-        from robosuite.devices import Keyboard
+        from robosuite.devices import Keyboard  # devices/keyboard.py：监听 GLFW 键盘事件
 
         device = Keyboard(
             env=env,
             pos_sensitivity=args.pos_sensitivity,
             rot_sensitivity=args.rot_sensitivity,
         )
-        env.viewer.add_keypress_callback(device.on_press)
+        env.viewer.add_keypress_callback(device.on_press)  # 注册键盘回调
     elif args.device == "spacemouse":
         from robosuite.devices import SpaceMouse
 

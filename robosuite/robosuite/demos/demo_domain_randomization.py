@@ -2,13 +2,22 @@
 Script to showcase domain randomization functionality.
 """
 
+# 【中文说明】
+# 功能：域随机化演示 —— 每次 reset 时随机改变场景外观（纹理/光照/相机/物理参数）
+# 目的：提升视觉策略从仿真到真实世界的迁移能力（Sim-to-Real Transfer）
+# 随机化选项：
+#   randomize_color=True    → 随机化物体/机器人颜色和材质
+#   randomize_camera=True   → 随机化相机位置和视角
+#   randomize_lighting=True → 随机化光源方向和强度
+#   randomize_dynamics=True → 随机化物理参数（摩擦/质量等）
+# 运行方式：python -m robosuite.demos.demo_domain_randomization
 import time
 
 import robosuite.macros as macros
 from robosuite.utils.input_utils import *
-from robosuite.wrappers import DomainRandomizationWrapper
+from robosuite.wrappers import DomainRandomizationWrapper  # 域随机化包装器
 
-# We'll use instance randomization so that entire geom groups are randomized together
+# 启用实例随机化：整组几何体（geom group）作为整体随机化，视觉上更自然
 macros.USING_INSTANCE_RANDOMIZATION = True
 
 if __name__ == "__main__":

@@ -16,11 +16,20 @@ import argparse
 import mujoco
 import numpy as np
 
+# 【中文说明】
+# 功能：USD 格式导出演示 —— 将操控轨迹导出为 Universal Scene Description 文件
+# USD 格式用途：在 Blender / NVIDIA Omniverse 等高质量渲染器中回放和渲染仿真动画
+# 核心流程：
+#   1. 遥操作生成轨迹
+#   2. exp.update_scene(data) 逐帧记录场景状态
+#   3. exp.save_scene("usd") 导出文件
+# 注意：mujoco==3.1.1 时需要 numpy < 2
+# 运行方式：python -m robosuite.demos.demo_usd_export
 import robosuite as suite
 from robosuite.controllers import load_composite_controller_config
 from robosuite.controllers.composite.composite_controller import WholeBody
 from robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
-from robosuite.utils.usd import exporter
+from robosuite.utils.usd import exporter    # USD 场景导出工具
 from robosuite.wrappers import VisualizationWrapper
 
 if mujoco.__version__ == "3.1.1" and np.__version__[0] == "2":

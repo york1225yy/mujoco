@@ -1,5 +1,13 @@
 """
-Play random actions in an environment and render a video that demonstrates segmentation.
+【中文说明】
+功能：语义分割演示 —— 将场景中的几何体按「实例/类别/元素」着色输出分割图像
+应用场景：视觉感知研究、目标检测数据集生成
+分割级别（--segmentation-level 参数）：
+  "instance" → 每个物体实例分配唯一颜色
+  "class"    → 同类物体使用相同颜色（如所有「机械臂」同色）
+  "element"  → 每个几何元素（geom）单独着色（最细粒度）
+关键：camera_segmentations 参数激活分割渲染，obs 中包含 "相机名_segmentation_级别" 键
+运行方式：python -m robosuite.demos.demo_segmentation --video-path /tmp/seg.mp4
 """
 import argparse
 import colorsys

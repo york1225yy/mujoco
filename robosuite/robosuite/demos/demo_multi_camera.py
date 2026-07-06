@@ -1,44 +1,40 @@
+# 【中文说明】
+# 功能：多相机视角演示 —— 同时显示多个相机的实时画面
+# 与 demo_random_action 几乎相同，唯一区别是调用了 set_camera(camera_name=[...]) 传入列表
+# 可用相机名："agentview"（正视）/ "birdview"（俯视）/ "frontview" / "sideview"
+#             / "robot0_eye_in_hand"（腕部相机）
+# 运行方式：python -m robosuite.demos.demo_multi_camera
 import time
 
 from robosuite.robots import MobileRobot
 from robosuite.utils.input_utils import *
 
-MAX_FR = 25  # max frame rate for running simluation
+MAX_FR = 25
 
 if __name__ == "__main__":
 
-    # Create dict to hold options that will be passed to env creation call
     options = {}
-
-    # print welcome info
     print("Welcome to robosuite v{}!".format(suite.__version__))
     print(suite.__logo__)
 
-    # Choose environment and add it to options
+    # 步骤1：选择环境和机器人（与 demo_random_action 完全相同）
     options["env_name"] = choose_environment()
 
-    # If a multi-arm environment has been chosen, choose configuration and appropriate robot(s)
     if "TwoArm" in options["env_name"]:
-        # Choose env config and add it to options
         options["env_configuration"] = choose_multi_arm_config()
-
-        # If chosen configuration was bimanual, the corresponding robot must be Baxter. Else, have user choose robots
         if options["env_configuration"] == "single-robot":
             options["robots"] = choose_robots(exclude_bimanual=False, use_humanoids=True, exclude_single_arm=True)
         else:
             options["robots"] = []
-
-            # Have user choose two robots
             for i in range(2):
                 print("Please choose Robot {}...\n".format(i))
                 options["robots"].append(choose_robots(exclude_bimanual=False, use_humanoids=True))
-    # If a humanoid environment has been chosen, choose humanoid robots
     elif "Humanoid" in options["env_name"]:
         options["robots"] = choose_robots(use_humanoids=True)
     else:
         options["robots"] = choose_robots(exclude_bimanual=False, use_humanoids=True)
 
-    # initialize the task
+    # 步骤2：创建环境（renderer="mujoco" 支持多视角分屏）
     env = suite.make(
         **options,
         has_renderer=True,
@@ -46,24 +42,24 @@ if __name__ == "__main__":
         ignore_done=True,
         use_camera_obs=False,
         control_freq=20,
-        renderer="mujoco",
+        renderer="mujoco",  # 使用 MuJoCo 原生渲染器（支持多相机分屏）
     )
     env.reset()
 
-    camera_name = ["agentview", "birdview"]
+    # 步骤3：关键区别 —— 传入相机名称列表实现多视角同时显示
+    camera_name = ["agentview", "birdview"]  # 可添加更多："frontview", "robot0_eye_in_hand" 等
     env.viewer.set_camera(camera_name=camera_name)
     for robot in env.robots:
         if isinstance(robot, MobileRobot):
             robot.enable_parts(legs=False, base=False)
 
-    # do visualization
+    # 步骤4：主循环（与 demo_random_action 完全相同）
     for i in range(10000):
         start = time.time()
         action = np.random.randn(*env.action_spec[0].shape)
         obs, reward, done, _ = env.step(action)
         env.render()
 
-        # limit frame rate if necessary
         elapsed = time.time() - start
         diff = 1 / MAX_FR - elapsed
         if diff > 0:

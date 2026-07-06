@@ -12,8 +12,15 @@ from glob import glob
 
 import numpy as np
 
+# 【中文说明】
+# 功能：数据采集与回放 —— 用 DataCollectionWrapper 记录轨迹，再精确回放
+# 典型用途：采集人类示范数据（模仿学习），或保存 RL 训练过程数据
+# 数据格式：
+#   /tmp/[时间戳]/model.xml      ← 完整场景XML（用于回放时重建环境）
+#   /tmp/[时间戳]/state_*.npz   ← 每步 MuJoCo 状态向量（qpos/qvel/act等）
+# 运行方式：python -m robosuite.demos.demo_collect_and_playback_data --environment Lift
 import robosuite as suite
-from robosuite.wrappers import DataCollectionWrapper
+from robosuite.wrappers import DataCollectionWrapper  # 数据采集包装器
 
 
 def collect_random_trajectory(env, timesteps=1000, max_fr=None):

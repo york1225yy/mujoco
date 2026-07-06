@@ -19,38 +19,39 @@ from robosuite.utils.binding_utils import MjRenderContextOffscreen, MjSim
 from robosuite.utils.mjcf_utils import new_actuator, new_joint
 
 if __name__ == "__main__":
+    # ----------------------------------------------------------------
+    # 【中文说明】此 Demo 展示「底层直接构建」方式，不使用 suite.make()
+    # 适合需要完全控制场景XML细节的高级用法
+    # 流程：手动创建 world → 添加 arena/gripper/object → 编译为 MuJoCo 模型 → 控制仿真
+    # ----------------------------------------------------------------
 
-    # start with an empty world
+    # 步骤1：创建空白 MuJoCo 世界容器（对应 <mujoco> 根标签）
     world = MujocoWorldBase()
 
-    # add a table
+    # 步骤2：添加桌面场景（table_arena.xml 提供桌子几何体）
     arena = TableArena(table_full_size=(0.4, 0.4, 0.05), table_offset=(0, 0, 1.1), has_legs=False)
-    world.merge(arena)
+    world.merge(arena)  # merge() 将 arena 的 XML 节点合并到 world
 
-    # add a gripper
-    gripper = RethinkGripper()
-    # Create another body with a slider joint to which we'll add this gripper
+    # 步骤3：添加夹爪
+    gripper = RethinkGripper()  # 加载 Rethink 夹爪的 MJCF 定义
+    # 创建一个带滑动关节的虚拟 body，用于控制夹爪的上下位置
     gripper_body = ET.Element("body", name="gripper_base")
     gripper_body.set("pos", "0 0 1.3")
-    gripper_body.set("quat", "0 0 1 0")  # flip z
-    gripper_body.append(new_joint(name="gripper_z_joint", type="slide", axis="0 0 1", damping="50"))
-    # Add the dummy body with the joint to the global worldbody
-    world.worldbody.append(gripper_body)
-    # Merge the actual gripper as a child of the dummy body
-    world.merge(gripper, merge_body="gripper_base")
-    # Create a new actuator to control our slider joint
+    gripper_body.set("quat", "0 0 1 0")  # 翻转z轴使夹爪朝下
+    gripper_body.append(new_joint(name="gripper_z_joint", type="slide", axis="0 0 1", damping="50"))  # 竖直滑动关节
+    world.worldbody.append(gripper_body)  # 添加到世界body
+    world.merge(gripper, merge_body="gripper_base")  # 夹爪作为虚拟body的子节点
+    # 为滑动关节创建位置控制器（kp=500 是位置增益）
     world.actuator.append(new_actuator(joint="gripper_z_joint", act_type="position", name="gripper_z", kp="500"))
 
-    # add an object for grasping
+    # 步骤4：添加目标抓取物体（红色小方块）
     mujoco_object = BoxObject(
         name="box", size=[0.02, 0.02, 0.02], rgba=[1, 0, 0, 1], friction=[1, 0.005, 0.0001]
-    ).get_obj()
-    # Set the position of this object
-    mujoco_object.set("pos", "0 0 1.11")
-    # Add our object to the world body
+    ).get_obj()  # get_obj() 返回 XML Element
+    mujoco_object.set("pos", "0 0 1.11")  # 放在桌面上
     world.worldbody.append(mujoco_object)
 
-    # add reference objects for x and y axes
+    # 添加坐标参考物体（绿色=x轴方向，蓝色=y轴方向，仅视觉，无物理碰撞）
     x_ref = BoxObject(
         name="x_ref", size=[0.01, 0.01, 0.01], rgba=[0, 1, 0, 1], obj_type="visual", joints=None
     ).get_obj()
@@ -62,12 +63,12 @@ if __name__ == "__main__":
     y_ref.set("pos", "0 0.2 1.105")
     world.worldbody.append(y_ref)
 
-    # start simulation
-    model = world.get_model(mode="mujoco")
+    # 步骤5：将 XML 模型编译为 MuJoCo 模型并初始化仿真
+    model = world.get_model(mode="mujoco")  # 将 XML 转为 MjModel 对象
 
-    sim = MjSim(model)
-    viewer = OpenCVViewer(sim)
-    render_context = MjRenderContextOffscreen(sim, device_id=-1)
+    sim = MjSim(model)                          # 创建仿真实例
+    viewer = OpenCVViewer(sim)                  # OpenCV 渲染窗口
+    render_context = MjRenderContextOffscreen(sim, device_id=-1)  # 离屏渲染上下文
     sim.add_render_context(render_context)
 
     sim_state = sim.get_state()
