@@ -48,7 +48,7 @@ GRASP_Z = -0.005         # 抓取时末端相对方块的 Z 偏移（轻微嵌�
 LIFT_HEIGHT = 0.25       # 提升目标高度（相对桌面）
 REACH_THRESH = 0.018     # 到达判定阈值（距目标小于此值视为到达）
 GRASP_STEPS = 25         # 关闭夹爪持续步数
-LIFT_STEPS = 60          # 提升持续步数
+LIFT_STEPS = 200          # 提升持续步数
 MAX_FR = 30              # 最大帧率限制
 
 
@@ -175,7 +175,7 @@ def run_grasp_episode(env):
     cube_pos = obs["cube_pos"].copy()
     grasp_pos = cube_pos.copy()
     grasp_pos[2] += GRASP_Z              # 下降到方块高度（轻微嵌入）
-    obs, reached = move_to(env, obs, grasp_pos, max_steps=150, gripper_cmd=-1.0)
+    obs, reached = move_to(env, obs, grasp_pos, max_steps=300, gripper_cmd=-1.0)
 
     # ── 阶段3：GRASP 关闭夹爪 ──────────────────────────
     obs = hold_action(env, obs, gripper_cmd=+1.0, steps=GRASP_STEPS,
