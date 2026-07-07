@@ -306,7 +306,7 @@ def execute_rrt_path(env, obs, waypoints, gripper_cmd, verbose=False,
         if verbose:
             print(f"    路径点 {i}/{n-1}: {wp.round(3)}")
         obs, _ = move_to(env, obs, wp,
-                         max_steps=80,
+                         max_steps=600,
                          gripper_cmd=gripper_cmd,
                          verbose=False,
                          **kw)
@@ -380,7 +380,7 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
     if use_plan:
         print("\n=== 阶段4：[RRT] 垂直提起，然后规划搬运路径 ===")
         # 先垂直提起（短距离，直接控制）
-        obs, _ = move_to(env, obs, lift_pos, max_steps=80, gripper_cmd=+1.0,
+        obs, _ = move_to(env, obs, lift_pos, max_steps=600, gripper_cmd=+1.0,
                          verbose=False, **kw)
         # 规划从提起位置到放置目标上方
         place_above = place_arr.copy()
@@ -390,11 +390,11 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
         obs = execute_rrt_path(env, obs, path, gripper_cmd=+1.0, **kw)
     else:
         print("\n=== 阶段4：TRANSPORT — 提起并搬运到放置目标上方 ===")
-        obs, _ = move_to(env, obs, lift_pos, max_steps=80, gripper_cmd=+1.0,
+        obs, _ = move_to(env, obs, lift_pos, max_steps=600, gripper_cmd=+1.0,
                          verbose=False, **kw)
         transport_tgt = place_arr.copy()
         transport_tgt[2] = lift_z
-        obs, _ = move_to(env, obs, transport_tgt, max_steps=250, gripper_cmd=+1.0, **kw)
+        obs, _ = move_to(env, obs, transport_tgt, max_steps=600, gripper_cmd=+1.0, **kw)
 
     # ── 阶段5：下降到放置高度（直接控制）────────────────
     print("\n=== 阶段5：DESCEND_PLACE — 下降到放置高度 ===")
