@@ -49,9 +49,9 @@ MAX_STEP       = 0.05    # 每步末端最大位移（米）
 GRASP_OFFSET_Z = 0.15   # 预抓取/搬运高出目标的距离（m）
 GRASP_Z_OFFSET = -0.005  # 抓取时末端轻微嵌入方块的偏移（m）
 REACH_THRESH   = 0.018   # 到达判定阈值（m）
-GRASP_STEPS    = 30      # 关闭夹爪持续步数
-RELEASE_STEPS  = 20      # 张开夹爪持续步数
-RETRACT_STEPS  = 60      # 放置后抬起手臂步数
+GRASP_STEPS    = 100      # 关闭夹爪持续步数
+RELEASE_STEPS  = 100      # 张开夹爪持续步数
+RETRACT_STEPS  = 100      # 放置后抬起手臂步数
 MAX_FR         = 30      # 最大帧率（fps）
 VIDEO_W        = 640     # 录制视频宽度
 VIDEO_H        = 480     # 录制视频高度
@@ -235,14 +235,14 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None):
     print("\n=== 阶段1：PRE_GRASP — 移到方块正上方 ===")
     tgt = cube_pos.copy()
     tgt[2] += GRASP_OFFSET_Z
-    obs, _ = move_to(env, obs, tgt, max_steps=200, gripper_cmd=-1.0, **kw)
+    obs, _ = move_to(env, obs, tgt, max_steps=500, gripper_cmd=-1.0, **kw)
 
     # ── 阶段2：DESCEND ───────────────────────────────────
     print("\n=== 阶段2：DESCEND — 下降到抓取高度 ===")
     cube_pos = obs["cube_pos"].copy()   # 重新读取防止漂移
     tgt = cube_pos.copy()
     tgt[2] += GRASP_Z_OFFSET
-    obs, _ = move_to(env, obs, tgt, max_steps=200, gripper_cmd=-1.0, **kw)
+    obs, _ = move_to(env, obs, tgt, max_steps=500, gripper_cmd=-1.0, **kw)
 
     # ── 阶段3：GRASP ─────────────────────────────────────
     obs = hold_gripper(env, obs, +1.0, GRASP_STEPS,
@@ -254,17 +254,17 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None):
     lift_z = cube_pos[2] + GRASP_OFFSET_Z
     lift_pos = obs["robot0_eef_pos"].copy()
     lift_pos[2] = lift_z
-    obs, _ = move_to(env, obs, lift_pos, max_steps=100, gripper_cmd=+1.0, **kw)
+    obs, _ = move_to(env, obs, lift_pos, max_steps=500, gripper_cmd=+1.0, **kw)
     # 4b: 水平移动到放置目标正上方（保持高度）
     transport_tgt = place_arr.copy()
     transport_tgt[2] = lift_z
-    obs, _ = move_to(env, obs, transport_tgt, max_steps=250, gripper_cmd=+1.0, **kw)
+    obs, _ = move_to(env, obs, transport_tgt, max_steps=500, gripper_cmd=+1.0, **kw)
 
     # ── 阶段5：DESCEND_PLACE ────────────────────────────
     print("\n=== 阶段5：DESCEND_PLACE — 下降到放置高度 ===")
     place_tgt = place_arr.copy()
     place_tgt[2] += GRASP_Z_OFFSET + 0.01
-    obs, _ = move_to(env, obs, place_tgt, max_steps=200, gripper_cmd=+1.0, **kw)
+    obs, _ = move_to(env, obs, place_tgt, max_steps=500, gripper_cmd=+1.0, **kw)
 
     # ── 阶段6：RELEASE ───────────────────────────────────
     obs = hold_gripper(env, obs, -1.0, RELEASE_STEPS,
