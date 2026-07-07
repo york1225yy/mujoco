@@ -54,9 +54,9 @@ MAX_STEP       = 0.05    # 每步末端最大位移（米）
 GRASP_OFFSET_Z = 0.15   # 预抓取/搬运时高出目标的距离（m）
 GRASP_Z_OFFSET = -0.005  # 抓取时末端轻微嵌入方块（m）
 REACH_THRESH   = 0.018   # 到达判定阈值（m）
-GRASP_STEPS    = 30      # 关闭夹爪持续步数
-RELEASE_STEPS  = 20      # 张开夹爪持续步数
-RETRACT_STEPS  = 60      # 放置后抬臂步数
+GRASP_STEPS    = 100      # 关闭夹爪持续步数
+RELEASE_STEPS  = 100      # 张开夹爪持续步数
+RETRACT_STEPS  = 100      # 放置后抬臂步数
 MAX_FR         = 30      # 最大帧率（fps）
 VIDEO_W        = 640     # 视频宽度
 VIDEO_H        = 480     # 视频高度
@@ -218,7 +218,7 @@ def _capture_frame(obs, camera, video_writer):
 # ─────────────────────────────────────────────────────────────
 # 核心控制函数
 # ─────────────────────────────────────────────────────────────
-def move_to(env, obs, target_pos, max_steps=200, gripper_cmd=-1.0,
+def move_to(env, obs, target_pos, max_steps=600, gripper_cmd=-1.0,
             verbose=True, video_writer=None, camera=None):
     """
     比例控制：将末端执行器移动到 target_pos。
@@ -358,14 +358,14 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
         obs = execute_rrt_path(env, obs, path, gripper_cmd=-1.0, **kw)
     else:
         print("\n=== 阶段1：PRE_GRASP — 移到方块正上方 ===")
-        obs, _ = move_to(env, obs, pre_grasp, max_steps=200, gripper_cmd=-1.0, **kw)
+        obs, _ = move_to(env, obs, pre_grasp, max_steps=600, gripper_cmd=-1.0, **kw)
 
     # ── 阶段2：下降到抓取高度（直接控制，短距离）────────
     print("\n=== 阶段2：DESCEND — 下降到抓取高度 ===")
     cube_pos = obs["cube_pos"].copy()   # 重新读取（防止漂移）
     grasp_pos = cube_pos.copy()
     grasp_pos[2] += GRASP_Z_OFFSET
-    obs, _ = move_to(env, obs, grasp_pos, max_steps=200, gripper_cmd=-1.0, **kw)
+    obs, _ = move_to(env, obs, grasp_pos, max_steps=600, gripper_cmd=-1.0, **kw)
 
     # ── 阶段3：关闭夹爪 ──────────────────────────────────
     obs = hold_gripper(env, obs, +1.0, GRASP_STEPS,
@@ -400,7 +400,7 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
     print("\n=== 阶段5：DESCEND_PLACE — 下降到放置高度 ===")
     place_tgt = place_arr.copy()
     place_tgt[2] += GRASP_Z_OFFSET + 0.01
-    obs, _ = move_to(env, obs, place_tgt, max_steps=200, gripper_cmd=+1.0, **kw)
+    obs, _ = move_to(env, obs, place_tgt, max_steps=600, gripper_cmd=+1.0, **kw)
 
     # ── 阶段6：释放夹爪 ──────────────────────────────────
     obs = hold_gripper(env, obs, -1.0, RELEASE_STEPS,
