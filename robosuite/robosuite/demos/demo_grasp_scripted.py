@@ -444,10 +444,10 @@ if __name__ == "__main__":
         description="脚本化机械臂抓取+放置 Demo（基于坐标控制，无需 RL）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--robot", type=str, default="Panda",
-                        help="机器人型号（Panda/UR5e/IIWA/Sawyer/xArm7 等）")
-    parser.add_argument("--gripper", type=str, default="default",
-                        help="夹爪型号（default=机器人默认 | PandaGripper | "
+    parser.add_argument("--robot", type=str, default="Kinova3",
+                        help="机器人型号（Kinova3/Panda/UR5e/IIWA/Sawyer/xArm7 等）")
+    parser.add_argument("--gripper", type=str, default="RobotiqThreeFingerGripper",
+                        help="夹爪型号（RobotiqThreeFingerGripper | PandaGripper | "
                              "Robotiq85Gripper | Robotiq140Gripper | RethinkGripper）")
     parser.add_argument("--place-pos", nargs=3, type=float, default=None,
                         metavar=("X", "Y", "Z"),
