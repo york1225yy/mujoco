@@ -446,7 +446,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--robot", type=str, default="Kinova3",
                         help="机器人型号（Kinova3/Panda/UR5e/IIWA/Sawyer/xArm7 等）")
-    parser.add_argument("--gripper", type=str, default="RobotiqThreeFingerGripper",
+    parser.add_argument("--gripper", type=str, default="PandaGripper",
                         help="夹爪型号（RobotiqThreeFingerGripper | PandaGripper | "
                              "Robotiq85Gripper | Robotiq140Gripper | RethinkGripper）")
     parser.add_argument("--place-pos", nargs=3, type=float, default=None,
@@ -458,7 +458,7 @@ if __name__ == "__main__":
                         help="RRT 步长（m），越小路径越精细但规划更慢（默认 0.07）")
     parser.add_argument("--plan-iter", type=int, default=3000,
                         help="RRT 最大迭代次数（默认 3000）")
-    parser.add_argument("--nreset", type=int, default=3,
+    parser.add_argument("--nreset", type=int, default=1,
                         help="重复次数（默认 3）")
     parser.add_argument("--speed", type=float, default=1.0,
                         help="速度缩放（默认 1.0，越大越快但精度下降）")
