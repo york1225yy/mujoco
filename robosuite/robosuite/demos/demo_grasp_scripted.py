@@ -218,7 +218,7 @@ def _capture_frame(obs, camera, video_writer):
 # ─────────────────────────────────────────────────────────────
 # D435i 相机画面实时可视化（功能：--show-camera）
 # ─────────────────────────────────────────────────────────────
-def show_camera_frame(obs, camera_name="d435i_rgb_camera"):
+def show_camera_frame(obs, camera_name="robot0_d435i_rgb_camera"):
     """
     使用 OpenCV 在独立窗口实时显示指定相机的画面。
 
@@ -524,7 +524,7 @@ if __name__ == "__main__":
     if save_video:
         print(f"  录制   : {args.save_video}  相机 : {args.camera}")
     if show_camera:
-        print(f"  相机可视化: D435i (d435i_rgb_camera)")
+        print(f"  相机可视化: D435i (robot0_d435i_rgb_camera)")
     print(f"{'='*58}")
 
     # ── 控制器配置（OSC_POSE：末端位移增量控制）─────────
@@ -553,7 +553,7 @@ if __name__ == "__main__":
         if save_video:
             cam_list.append(args.camera)
         if show_camera:
-            cam_list.append("d435i_rgb_camera")
+            cam_list.append("robot0_d435i_rgb_camera")
         cam_list = list(dict.fromkeys(cam_list))  # 去重保序
         make_kwargs.update(
             camera_names=cam_list,
@@ -612,7 +612,7 @@ if __name__ == "__main__":
             video_writer=video_writer,
             camera=args.camera if save_video else None,
             planner=planner,
-            show_camera_name="d435i_rgb_camera" if show_camera else None,
+            show_camera_name="robot0_d435i_rgb_camera" if show_camera else None,
         )
         results.append(success)
 
