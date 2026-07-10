@@ -67,6 +67,12 @@
                       <joint name="Actuator7" pos="0 0 0" axis="0 0 1" damping="0.01"/>
                       <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="1 1 1 1" name="b_visual" mesh="bracelet_with_vision_link"/>
                       <geom type="mesh" conaffinity="0" rgba="0.75294 0.75294 0.75294 1" mesh="bracelet_with_vision_link" name="b_collision"/>
+                      <!-- D435i RealSense 深度相机 - 位置参数与 gen3_with_camera.xml 完全一致
+                           d435i_camera_body: pos="0 -0.056 -0.060" quat="0 1 0 0" (相对 Bracelet_Link)
+                           d435i_rgb_camera:  pos="0.0325 0 -0.0036" quat="0 1 0 0" fovy=42.5° (相对 d435i_camera_body) -->
+                      <body name="d435i_camera_body" pos="0 -0.056 -0.060" quat="0 1 0 0">
+                        <camera name="d435i_rgb_camera" pos="0.0325 0 -0.0036" quat="0 1 0 0" fovy="42.5" resolution="640 480"/>
+                      </body>
                       <body name="right_hand" pos="0 0 -0.0615" quat="0 0.707105 -0.707108 0">
                         <!-- This camera points out from the eef. -->
                         <camera mode="fixed" name="eye_in_hand" pos="0.05 0 0" quat="0 0.707108 0.707108 0" fovy="75"/>

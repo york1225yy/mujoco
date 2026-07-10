@@ -216,10 +216,36 @@ def _capture_frame(obs, camera, video_writer):
 
 
 # ─────────────────────────────────────────────────────────────
+# D435i 相机画面实时可视化（功能：--show-camera）
+# ─────────────────────────────────────────────────────────────
+def show_camera_frame(obs, camera_name="d435i_rgb_camera"):
+    """
+    使用 OpenCV 在独立窗口实时显示指定相机的画面。
+
+    robosuite 默认 opengl 格式：RGB 通道、Y 轴朝上（图像上下翻转）。
+    OpenCV imshow 需要 BGR 通道、Y 轴朝下，故做两步转换：
+      1. 垂直翻转（[::-1]）
+      2. RGB → BGR（[:, :, ::-1]）
+    当 macros.IMAGE_CONVENTION = "opencv" 时图像已正向、BGR，仅垂直翻转一次。
+    """
+    import cv2
+    img_key = f"{camera_name}_image"
+    if img_key not in obs:
+        return
+    img = obs[img_key].copy()
+    if macros.IMAGE_CONVENTION == "opencv":
+        img = img[::-1]                 # 仅垂直翻转
+    else:
+        img = img[::-1, :, ::-1]        # 垂直翻转 + RGB→BGR
+    cv2.imshow("D435i 相机视图", img)
+    cv2.waitKey(1)
+
+
+# ─────────────────────────────────────────────────────────────
 # 核心控制函数
 # ─────────────────────────────────────────────────────────────
 def move_to(env, obs, target_pos, max_steps=600, gripper_cmd=-1.0,
-            verbose=True, video_writer=None, camera=None):
+            verbose=True, video_writer=None, camera=None, show_camera_name=None):
     """
     比例控制：将末端执行器移动到 target_pos。
 
@@ -256,6 +282,8 @@ def move_to(env, obs, target_pos, max_steps=600, gripper_cmd=-1.0,
         env.render()
         if video_writer is not None:
             _capture_frame(obs, camera, video_writer)
+        if show_camera_name is not None:
+            show_camera_frame(obs, show_camera_name)
 
         elapsed = time.time() - start
         diff = 1 / MAX_FR - elapsed
@@ -268,7 +296,7 @@ def move_to(env, obs, target_pos, max_steps=600, gripper_cmd=-1.0,
 
 
 def hold_gripper(env, obs, gripper_cmd, steps, stage_name="",
-                 video_writer=None, camera=None):
+                 video_writer=None, camera=None, show_camera_name=None):
     """末端静止，只执行夹爪开合（+1=关闭抓取，-1=张开释放）。"""
     if stage_name:
         print(f"\n{stage_name}")
@@ -280,6 +308,8 @@ def hold_gripper(env, obs, gripper_cmd, steps, stage_name="",
         env.render()
         if video_writer is not None:
             _capture_frame(obs, camera, video_writer)
+        if show_camera_name is not None:
+            show_camera_frame(obs, show_camera_name)
         elapsed = time.time() - start
         diff = 1 / MAX_FR - elapsed
         if diff > 0:
@@ -316,7 +346,8 @@ def execute_rrt_path(env, obs, waypoints, gripper_cmd, verbose=False,
 # ─────────────────────────────────────────────────────────────
 # 主流程：抓取+放置
 # ─────────────────────────────────────────────────────────────
-def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=None):
+def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=None,
+                       show_camera_name=None):
     """
     执行一次完整的抓取+放置。
 
@@ -346,7 +377,7 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
     print(f"  末端初始位置 : {obs['robot0_eef_pos'].round(3)}")
     print(f"  运动模式     : {'RRT 路径规划' if use_plan else '固定 6 阶段'}")
 
-    kw = dict(video_writer=video_writer, camera=camera)
+    kw = dict(video_writer=video_writer, camera=camera, show_camera_name=show_camera_name)
 
     # ── 阶段1：到达预抓取位置（方块正上方）─────────────
     pre_grasp = cube_pos.copy()
@@ -430,6 +461,8 @@ def run_pick_and_place(env, place_pos, video_writer=None, camera=None, planner=N
         env.render()
         if video_writer is not None:
             _capture_frame(obs, camera, video_writer)
+        if show_camera_name is not None:
+            show_camera_frame(obs, show_camera_name)
         time.sleep(1 / MAX_FR)
 
     return success
@@ -466,10 +499,15 @@ if __name__ == "__main__":
                         help="视频保存路径（如 output.mp4），不填则不录制")
     parser.add_argument("--camera", type=str, default="agentview",
                         help="录制相机名称（默认 agentview）")
+    parser.add_argument("--show-camera", action="store_true",
+                        help="实时显示 D435i 相机画面（需要安装 opencv-python）")
     args = parser.parse_args()
 
-    MAX_STEP   = 0.05 * args.speed
-    save_video = args.save_video is not None
+    MAX_STEP    = 0.05 * args.speed
+    save_video  = args.save_video is not None
+    show_camera = args.show_camera
+    # 离屏渲染：录制视频 或 相机可视化 均需要开启
+    need_offscreen = save_video or show_camera
 
     if save_video:
         macros.IMAGE_CONVENTION = "opencv"
@@ -485,6 +523,8 @@ if __name__ == "__main__":
         print(f"  放置点 : {args.place_pos}")
     if save_video:
         print(f"  录制   : {args.save_video}  相机 : {args.camera}")
+    if show_camera:
+        print(f"  相机可视化: D435i (d435i_rgb_camera)")
     print(f"{'='*58}")
 
     # ── 控制器配置（OSC_POSE：末端位移增量控制）─────────
@@ -499,17 +539,24 @@ if __name__ == "__main__":
         robots=args.robot,
         controller_configs=ctrl_cfg,
         has_renderer=True,
-        has_offscreen_renderer=save_video,
-        use_camera_obs=save_video,
+        has_offscreen_renderer=need_offscreen,
+        use_camera_obs=need_offscreen,
         use_object_obs=True,
         reward_shaping=False,
         control_freq=20,
         ignore_done=True,
         hard_reset=False,
     )
-    if save_video:
+    if need_offscreen:
+        # 构建所需相机列表（录制相机 + D435i 可视化相机）
+        cam_list = []
+        if save_video:
+            cam_list.append(args.camera)
+        if show_camera:
+            cam_list.append("d435i_rgb_camera")
+        cam_list = list(dict.fromkeys(cam_list))  # 去重保序
         make_kwargs.update(
-            camera_names=args.camera,
+            camera_names=cam_list,
             camera_heights=VIDEO_H,
             camera_widths=VIDEO_W,
         )
@@ -565,6 +612,7 @@ if __name__ == "__main__":
             video_writer=video_writer,
             camera=args.camera if save_video else None,
             planner=planner,
+            show_camera_name="d435i_rgb_camera" if show_camera else None,
         )
         results.append(success)
 
@@ -581,5 +629,9 @@ if __name__ == "__main__":
     for i, s in enumerate(results):
         print(f"  第 {i+1} 次: {'✓ 成功' if s else '✗ 失败'}")
     print(f"{'='*58}\n")
+
+    if show_camera:
+        import cv2
+        cv2.destroyAllWindows()
 
     env.close()
