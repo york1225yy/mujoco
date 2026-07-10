@@ -72,6 +72,30 @@
                            d435i_rgb_camera:  pos="0.0325 0 -0.0036" quat="0 1 0 0" fovy=42.5° (相对 d435i_camera_body) -->
                       <body name="d435i_camera_body" pos="0 -0.056 -0.060" quat="0 1 0 0">
                         <camera name="d435i_rgb_camera" pos="0.0325 0 -0.0036" quat="0 1 0 0" fovy="42.5" resolution="640 480"/>
+                        <!-- D435i 外壳（纯视觉，不参与碰撞）-->
+                        <!-- 主机身：99×25×25mm，深灰色 -->
+                        <geom type="box" size="0.0495 0.0125 0.0125"
+                              pos="0.0325 0 0"
+                              contype="0" conaffinity="0" group="1"
+                              rgba="0.25 0.25 0.25 1"/>
+                        <!-- RGB 镜头（中间） -->
+                        <geom type="cylinder" size="0.007 0.004"
+                              pos="0.0325 0 -0.013"
+                              quat="0.707107 0 0.707107 0"
+                              contype="0" conaffinity="0" group="1"
+                              rgba="0.1 0.1 0.1 1"/>
+                        <!-- 左 IR 镜头 -->
+                        <geom type="cylinder" size="0.005 0.004"
+                              pos="0.0325 0.020 -0.013"
+                              quat="0.707107 0 0.707107 0"
+                              contype="0" conaffinity="0" group="1"
+                              rgba="0.1 0.1 0.1 1"/>
+                        <!-- 右 IR 镜头 -->
+                        <geom type="cylinder" size="0.005 0.004"
+                              pos="0.0325 -0.020 -0.013"
+                              quat="0.707107 0 0.707107 0"
+                              contype="0" conaffinity="0" group="1"
+                              rgba="0.1 0.1 0.1 1"/>
                       </body>
                       <body name="right_hand" pos="0 0 -0.0615" quat="0 0.707105 -0.707108 0">
                         <!-- This camera points out from the eef. -->
