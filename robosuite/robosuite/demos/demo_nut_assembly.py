@@ -52,6 +52,7 @@ import numpy as np
 
 import robosuite as suite
 import robosuite.macros as macros
+import robosuite.utils.transform_utils as T
 from robosuite.controllers.composite.composite_controller_factory import (
     refactor_composite_controller_config,
 )
@@ -73,6 +74,14 @@ VIDEO_H           = 480     # 视频高度
 # 套入插销时螺母中心的目标高度 = table_z + 此偏移
 # 螺母半高 ~0.010 m，下降到桌面以上 0.020 m 即可触发 on_peg 判定
 PEG_PLACE_Z_ABOVE_TABLE = 0.020
+
+# ── 夹爪偏航对齐参数 ──────────────────────────────────────────
+# 手柄沿螺母局部 +X 延伸，夹爪应沿螺母局部 Y 方向开合（垂直手柄）。
+# OSC_POSE: output_max[5]=0.5 rad，input_max=1 → action[5]=1.0 ≈ 0.5 rad/step
+GRIPPER_OPEN_AXIS  = 1      # EEF 局部坐标轴索引：0=X, 1=Y（PandaGripper 默认）
+YAW_THRESH_RAD     = 0.06   # 对齐判定阈值（rad，约 3.4°）
+ROT_ACTION_MAX     = 0.8    # 旋转 action 幅值上限（≤1.0）
+ROT_ALIGN_STEPS    = 200    # 最大对齐步数
 
 
 # ─────────────────────────────────────────────────────────────
@@ -285,6 +294,85 @@ def execute_rrt_path(env, obs, waypoints, gripper_cmd, verbose=False,
 
 
 # ─────────────────────────────────────────────────────────────
+# 夹爪偏航对齐辅助函数
+# ─────────────────────────────────────────────────────────────
+def _get_eef_opening_yaw(env):
+    """
+    从仿真获取末端执行器「开合轴」在世界 XY 平面的偏航角（弧度）。
+
+    开合轴 = EEF 局部坐标系的第 GRIPPER_OPEN_AXIS 列在世界系的投影。
+    对于 PandaGripper，夹爪沿 EEF 局部 Y 轴（GRIPPER_OPEN_AXIS=1）开合。
+    site_xmat 为行优先存储的 3×3 旋转矩阵（列 = EEF 局部轴的世界方向）。
+    """
+    arm = list(env.robots[0].eef_site_id.keys())[0]      # 取第一个手臂（right / left）
+    eef_id = env.robots[0].eef_site_id[arm]
+    R = env.sim.data.site_xmat[eef_id].reshape(3, 3)     # 3×3 旋转矩阵
+    open_axis_world = R[:, GRIPPER_OPEN_AXIS]             # 开合轴在世界系的方向
+    return np.arctan2(open_axis_world[1], open_axis_world[0])
+
+
+def _handle_target_yaw(nut_quat_xyzw):
+    """
+    计算「夹爪开合轴」应对准的目标偏航角。
+
+    手柄沿螺母局部 +X 轴延伸，手柄宽度方向 = 螺母局部 Y 轴。
+    夹爪应沿螺母局部 Y 方向开合 → 目标偏航 = 螺母局部 Y 轴在世界 XY 中的角度。
+    nut_quat_xyzw 为 obs 中的格式（robosuite 惯例 xyzw）。
+    """
+    R = T.quat2mat(nut_quat_xyzw)                         # 螺母旋转矩阵
+    nut_y_world = R[:, 1]                                 # 螺母局部 Y 轴在世界系
+    return np.arctan2(nut_y_world[1], nut_y_world[0])
+
+
+def align_gripper_to_handle(env, obs, nut_quat_xyzw,
+                             video_writer=None, camera=None, show_camera_name=None):
+    """
+    绕世界 Z 轴旋转末端执行器，使夹爪开合轴与螺母手柄宽度方向对齐。
+
+    利用 OSC_POSE 的 action[5]（绕 base-frame Z 轴的轴角增量）做比例控制。
+    由于平行夹爪 180° 对称，角度误差归一化到 [−π/2, π/2]。
+    末端位置保持不动（action[:3] = 0），夹爪保持张开（action[6:] = −1）。
+    """
+    target_yaw = _handle_target_yaw(nut_quat_xyzw)
+    print(f"    目标偏航: {np.degrees(target_yaw):.1f}°")
+
+    for step in range(ROT_ALIGN_STEPS):
+        start       = time.time()
+        current_yaw = _get_eef_opening_yaw(env)
+
+        # 计算误差，利用 180° 对称性归一化到 [−90°, 90°]
+        err = target_yaw - current_yaw
+        err = (err + np.pi / 2) % np.pi - np.pi / 2
+
+        if step % 30 == 0:
+            print(f"    [对齐] 当前偏航={np.degrees(current_yaw):.1f}°  误差={np.degrees(err):.1f}°")
+
+        if abs(err) < YAW_THRESH_RAD:
+            print(f"    ✓ 夹爪方向对齐（{step + 1} 步，误差={np.degrees(err):.1f}°）")
+            return obs
+
+        action = np.zeros(env.action_dim)
+        # 比例控制：误差越大旋转越快；action[5] = 绕 base-Z 旋转增量
+        action[5]  = float(np.clip(err * 2.0, -ROT_ACTION_MAX, ROT_ACTION_MAX))
+        action[6:] = -1.0   # 夹爪张开
+
+        obs, _, _, _ = env.step(action)
+        env.render()
+        if video_writer is not None:
+            _capture_frame(obs, camera, video_writer)
+        if show_camera_name is not None:
+            show_camera_frame(obs, show_camera_name)
+
+        elapsed = time.time() - start
+        diff = 1 / MAX_FR - elapsed
+        if diff > 0:
+            time.sleep(diff)
+
+    print(f"    ✗ 夹爪对齐超时（{ROT_ALIGN_STEPS} 步）")
+    return obs
+
+
+# ─────────────────────────────────────────────────────────────
 # 单颗螺母装配
 # ─────────────────────────────────────────────────────────────
 def assemble_nut(env, obs, nut_obs_key, peg_pos, table_z,
@@ -337,7 +425,17 @@ def assemble_nut(env, obs, nut_obs_key, peg_pos, table_z,
     print(f"  插销对准 XY  : {peg_align_xy.round(4)}（= 插销 XY + 偏移）")
     print(f"  套入目标 Z   : {place_z:.3f}m  桌面 Z: {table_z:.3f}m")
     print(f"  运动模式     : {'RRT 路径规划' if planner else '固定 8 阶段'}")
-
+    # ── 阶段0：对齐夹爪偏航角（ALIGN_GRIPPER）──────────────
+    # 手柄沿螺母局部 +X 延伸，夹爪需沿螺母局部 Y 方向开合（垂直于手柄）。
+    # 此阶段末端位置不变，仅旋转 EEF 绕 Z 轴到目标偏航角。
+    if handle_site_id is not None:
+        nut_quat_key = nut_obs_key.replace("_pos", "_quat")
+        nut_quat_xyzw = obs[nut_quat_key].copy()
+        print(f"\n=== [{nut_label}] 阶段0：ALIGN_GRIPPER — 对齐夹爪偏航角 ===")
+        handle_yaw_deg = np.degrees(_handle_target_yaw(nut_quat_xyzw))
+        print(f"    手柄方向（螺母局部 X 轴）偏航: {handle_yaw_deg - 90:.1f}°  "
+              f"→ 夹爪目标偏航: {handle_yaw_deg:.1f}°")
+        obs = align_gripper_to_handle(env, obs, nut_quat_xyzw, **kw)
     # ── 阶段1：移到夹取点正上方（PRE_GRASP）──────────────
     # XY 对准 handle_site（螺母实体边缘），Z 悬停在螺母上方
     pre_grasp = np.array([grasp_xy[0], grasp_xy[1], nut_pos[2] + GRASP_OFFSET_Z])
