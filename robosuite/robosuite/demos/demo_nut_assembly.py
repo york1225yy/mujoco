@@ -288,51 +288,78 @@ def execute_rrt_path(env, obs, waypoints, gripper_cmd, verbose=False,
 # 单颗螺母装配
 # ─────────────────────────────────────────────────────────────
 def assemble_nut(env, obs, nut_obs_key, peg_pos, table_z,
-                 nut_label, planner=None,
+                 nut_label, handle_site_id=None, planner=None,
                  video_writer=None, camera=None, show_camera_name=None):
     """
     抓取一颗螺母并将其套入对应插销（8 阶段流程）。
 
     参数：
-        obs          : 当前环境观测字典
-        nut_obs_key  : 螺母在 obs 中的位置键，如 "SquareNut_pos"
-        peg_pos      : 插销在世界坐标系中的位置 (3,)
-        table_z      : 桌面 Z 坐标（用于计算套入高度）
-        nut_label    : 打印标签，用于区分两颗螺母
-        planner      : CartesianRRT 实例（None 表示不使用规划）
+        obs            : 当前环境观测字典
+        nut_obs_key    : 螺母在 obs 中的位置键，如 "SquareNut_pos"
+        peg_pos        : 插销在世界坐标系中的位置 (3,)
+        table_z        : 桌面 Z 坐标（用于计算套入高度）
+        nut_label      : 打印标签，用于区分两颗螺母
+        handle_site_id : 螺母 handle_site 在仿真中的 site id（由
+                         env.object_site_ids[i] 取得）。
+                         螺母是空心环，夹爪若移到质心（孔中心）会空夹，
+                         因此需偏移到 handle_site 所在的实体边缘处抓取。
+                         搬运时对插销对准坐标施加反向补偿，确保孔对准插销。
+        planner        : CartesianRRT 实例（None 表示不使用规划）
 
     返回：
         (obs, success)  success=True 表示螺母已成功套入插销
     """
     kw = dict(video_writer=video_writer, camera=camera, show_camera_name=show_camera_name)
-    nut_pos   = obs[nut_obs_key].copy()
-    # 套入后螺母中心应接近桌面层
-    place_z   = table_z + PEG_PLACE_Z_ABOVE_TABLE
-    # 搬运高度（提起螺母后在空中的 Z）
+    nut_pos     = obs[nut_obs_key].copy()
+    place_z     = table_z + PEG_PLACE_Z_ABOVE_TABLE
     transport_z = nut_pos[2] + GRASP_OFFSET_Z
 
-    print(f"\n  螺母初始位置 : {nut_pos.round(3)}")
+    # ── 计算夹取点 XY 及插销对准补偿 ──────────────────────
+    # 螺母 body 中心 = 孔中心，夹爪若对准质心会落入空洞夹不住螺母。
+    # handle_site 定义在螺母实体边缘（XML 中偏移约 0.054~0.06 m），
+    # 夹爪对准 handle 才能夹到实体。
+    # 抓取后夹爪在 handle 处，孔中心 = handle - xy_offset；
+    # 为使孔对准插销 XY，夹爪目标 XY = peg_xy + xy_offset。
+    if handle_site_id is not None:
+        handle_pos   = env.sim.data.site_xpos[handle_site_id].copy()
+        grasp_xy     = handle_pos[:2]
+        xy_offset    = handle_pos[:2] - nut_pos[:2]   # handle 相对孔中心的偏移
+    else:
+        grasp_xy  = nut_pos[:2]
+        xy_offset = np.zeros(2)
+
+    # 搬运/下压时夹爪目标 XY（补偿后让孔对准插销）
+    peg_align_xy = peg_pos[:2] + xy_offset
+
+    print(f"\n  螺母质心位置 : {nut_pos.round(3)}")
+    print(f"  夹取点 XY   : {grasp_xy.round(4)}  偏移: {xy_offset.round(4)}")
     print(f"  插销位置     : {peg_pos.round(3)}")
+    print(f"  插销对准 XY  : {peg_align_xy.round(4)}（= 插销 XY + 偏移）")
     print(f"  套入目标 Z   : {place_z:.3f}m  桌面 Z: {table_z:.3f}m")
     print(f"  运动模式     : {'RRT 路径规划' if planner else '固定 8 阶段'}")
 
-    # ── 阶段1：移到螺母正上方（PRE_GRASP）─────────────────
-    pre_grasp = nut_pos.copy()
-    pre_grasp[2] += GRASP_OFFSET_Z
+    # ── 阶段1：移到夹取点正上方（PRE_GRASP）──────────────
+    # XY 对准 handle_site（螺母实体边缘），Z 悬停在螺母上方
+    pre_grasp = np.array([grasp_xy[0], grasp_xy[1], nut_pos[2] + GRASP_OFFSET_Z])
 
     if planner:
-        print(f"\n=== [{nut_label}] 阶段1：[RRT] 规划到预抓取位置 ===")
+        print(f"\n=== [{nut_label}] 阶段1：[RRT] 规划到预抓取位置（handle 边缘上方）===")
         path = planner.plan(obs["robot0_eef_pos"].copy(), pre_grasp)
         obs = execute_rrt_path(env, obs, path, gripper_cmd=-1.0, **kw)
     else:
-        print(f"\n=== [{nut_label}] 阶段1：PRE_GRASP — 移到螺母正上方 ===")
+        print(f"\n=== [{nut_label}] 阶段1：PRE_GRASP — 移到螺母边缘（handle）上方 ===")
         obs, _ = move_to(env, obs, pre_grasp, max_steps=600, gripper_cmd=-1.0, **kw)
 
     # ── 阶段2：下降到抓取高度（DESCEND）───────────────────
-    print(f"\n=== [{nut_label}] 阶段2：DESCEND — 下降到抓取高度 ===")
+    print(f"\n=== [{nut_label}] 阶段2：DESCEND — 下降到螺母边缘抓取高度 ===")
     nut_pos = obs[nut_obs_key].copy()   # 重新读取（防止漂移）
-    grasp_pos = nut_pos.copy()
-    grasp_pos[2] += GRASP_Z_OFFSET
+    # 同步刷新 handle 位置（螺母可能因接触轻微位移）
+    if handle_site_id is not None:
+        handle_pos   = env.sim.data.site_xpos[handle_site_id].copy()
+        grasp_xy     = handle_pos[:2]
+        xy_offset    = handle_pos[:2] - nut_pos[:2]
+        peg_align_xy = peg_pos[:2] + xy_offset
+    grasp_pos = np.array([grasp_xy[0], grasp_xy[1], nut_pos[2] + GRASP_Z_OFFSET])
     obs, _ = move_to(env, obs, grasp_pos, max_steps=600, gripper_cmd=-1.0, **kw)
 
     # ── 阶段3：关闭夹爪（GRASP）──────────────────────────
@@ -347,21 +374,24 @@ def assemble_nut(env, obs, nut_obs_key, peg_pos, table_z,
                      verbose=False, **kw)
 
     # ── 阶段5：平移到插销正上方（ALIGN_PEG）──────────────
-    peg_above = np.array([peg_pos[0], peg_pos[1], transport_z])
+    # 夹爪在 handle 处（偏离孔中心 xy_offset），
+    # 目标 XY = peg_xy + xy_offset，使螺母孔正对插销
+    peg_above = np.array([peg_align_xy[0], peg_align_xy[1], transport_z])
 
     if planner:
-        print(f"\n=== [{nut_label}] 阶段5：[RRT] 规划搬运路径 → 插销上方 ===")
+        print(f"\n=== [{nut_label}] 阶段5：[RRT] 规划搬运路径 → 插销对准上方 ===")
         print(f"    {obs['robot0_eef_pos'].round(3)} → {peg_above.round(3)}")
         path = planner.plan(obs["robot0_eef_pos"].copy(), peg_above)
         obs = execute_rrt_path(env, obs, path, gripper_cmd=+1.0, **kw)
     else:
-        print(f"\n=== [{nut_label}] 阶段5：ALIGN_PEG — 平移到插销正上方 ===")
+        print(f"\n=== [{nut_label}] 阶段5：ALIGN_PEG — 平移到插销对准位置上方 ===")
+        print(f"    目标 XY={peg_above[:2].round(4)}（插销 XY={peg_pos[:2].round(4)} + 偏移={xy_offset.round(4)}）")
         obs, _ = move_to(env, obs, peg_above, max_steps=600, gripper_cmd=+1.0, **kw)
 
     # ── 阶段6：下降套入插销（DESCEND_PLACE）──────────────
-    # 目标：peg_pos 的 XY + 桌面层 Z（螺母孔从插销顶端滑入到底）
+    # XY 保持补偿后的对准坐标，Z 下降到桌面层让孔从插销顶滑入
     print(f"\n=== [{nut_label}] 阶段6：DESCEND_PLACE — 孔洞套入插销 ===")
-    place_pos = np.array([peg_pos[0], peg_pos[1], place_z])
+    place_pos = np.array([peg_align_xy[0], peg_align_xy[1], place_z])
     obs, _ = move_to(env, obs, place_pos, max_steps=800, gripper_cmd=+1.0, **kw)
 
     # ── 阶段7：释放夹爪（RELEASE）────────────────────────
@@ -424,21 +454,23 @@ def run_nut_assembly(env, order="square_first",
     kw = dict(video_writer=video_writer, camera=camera,
               planner=planner, show_camera_name=show_camera_name)
 
-    # 两颗螺母的装配参数：(obs_key, peg_pos, label)
+    # 两颗螺母的装配参数：(obs_key, peg_pos, label, handle_site_id)
+    # env.object_site_ids[0] = SquareNut 的 handle_site
+    # env.object_site_ids[1] = RoundNut  的 handle_site
     tasks = {
-        "square": ("SquareNut_pos", peg1_pos, "SquareNut→peg1（方形）"),
-        "round":  ("RoundNut_pos",  peg2_pos, "RoundNut→peg2（圆形）"),
+        "square": ("SquareNut_pos", peg1_pos, "SquareNut→peg1（方形）", env.object_site_ids[0]),
+        "round":  ("RoundNut_pos",  peg2_pos, "RoundNut→peg2（圆形）",  env.object_site_ids[1]),
     }
     task_order = ["square", "round"] if order == "square_first" else ["round", "square"]
 
     results = {}
     for key in task_order:
-        nut_obs_key, peg_pos, label = tasks[key]
+        nut_obs_key, peg_pos, label, handle_site_id = tasks[key]
         print(f"\n\n{'━'*54}")
         print(f"  装配：{label}")
         print(f"{'━'*54}")
         obs, ok = assemble_nut(env, obs, nut_obs_key, peg_pos, table_z,
-                               label, **kw)
+                               label, handle_site_id=handle_site_id, **kw)
         results[key] = ok
 
     # 保持一秒渲染最终状态
